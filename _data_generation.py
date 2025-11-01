@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 np.random.seed(42)
 from shapely.geometry import Point, LineString
@@ -35,9 +36,30 @@ class DataGenerator:
         )
 
     def _construct_locations(self):
-        self.loc_customers = [
-            _generate_random_point(self.args['loc_depot'], self.args['r'])
-            for _ in range(self.args['I'])
+        '''
+        Build node coordinates and distance matrix.
+        If args['customers_csv'] is provided, load customers from CSV (lon/lat).
+        Otherwise, fall back to random generation as in the original repo.
+        '''
+        csv_path = self.args.get('customers_csv', '')
+        if csv_path:
+            lat_col = self.args.get('lat_col', 'lat')
+            lon_col = self.args.get('lon_col', 'lon')
+            df = pd.read_csv(csv_path)
+
+            # store for later use (demands / windows if present)
+            self._df = df.copy()
+
+            # build customers as (lat, lon) tuples (repo expects this order)
+            self.loc_customers = list(
+                zip(df[lat_col].to_numpy().tolist(), df[lon_col].to_numpy().tolist())
+            )
+            # I comes from CSV length
+            self.args['I'] = len(self.loc_customers)
+        else:
+            self.loc_customers = [
+                _generate_random_point(self.args['loc_depot'], self.args['r'])
+                for _ in range(self.args['I'])
         ]
         self.locations = [self.args['loc_depot']] + self.loc_customers
         self.dist_matrix = _dist_matrix(self.locations)

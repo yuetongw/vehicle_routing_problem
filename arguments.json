@@ -1,5 +1,20 @@
 [
   {
+    "parameter": "customers_csv",
+    "value": "data/customers.csv",
+    "description": "Path to CSV with customer coordinates."
+  },
+  {
+    "parameter": "lat_col",
+    "value": "lat",
+    "description": "Latitude column name in customers_csv."
+  },
+  {
+    "parameter": "lon_col",
+    "value": "lon",
+    "description": "Longitude column name in customers_csv."
+  },  
+  {
     "parameter": "V",
     "value": 4,
     "description": "Number of vehicles"
