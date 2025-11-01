@@ -18,19 +18,50 @@ class DataGenerator:
         self.fig, self.ax = plt.subplots(figsize=(8, 8), dpi=100)
 
     def _generate_random_data(self, _min=100, _max=1000):
-        self.demand = [self.args['demand_per_customer']] * self.args['I']
-        self.e_t = np.random.choice(
-            range(self.args['day_start'], self.args['day_end'] - 1),
-            self.args['I']
-            ).tolist()
-        time_duration = np.random.choice(
-            list(range(self.args['max_time_window_length'])),
-            self.args['I']
-            )
-        time_duration = time_duration.tolist()
-        self.l_t = [min(s + d, self.args['day_end']) for s, d in
-                    zip(self.e_t, time_duration)
-                    ]
+        '''
+        Original method creates random demand/time-window data.
+        We keep that behavior unless a CSV with columns is present.
+        Supported optional columns: demand, tw_start, tw_end, service_time
+        '''
+        # If a CSV was loaded and has columns, use them; else fallback to original random.
+        df = getattr(self, "_df", None)
+        I = int(self.args['I']) # number of customers
+
+        # ----- Demand -----
+        if df is not None and 'demand' in df.columns:
+            self.demand = df['demand'].astype(float).to_list()
+        else:
+            # uniform demand per customer
+            self.demand = [self.args['demand_per_customer']] * self.args['I']
+
+        # ----- Time Windows (earlist e_t, latest l_t) -----
+        if df is not None and 'tw_start' in df.columns and 'tw_end' in df.columns:
+            self.e_t = df['tw_start'].astype(float).to_list()
+            self.l_t = df['tw_end'].astype(float).to_list()
+        else:
+            # random windows if enabled, else zeros
+            day_start = int(self.args["day_start"])
+            day_end   = int(self.args["day_end"])
+            if self.args.get("time_windows", 0) == 1:
+                # start times uniformly at hours in [day_start, day_end-1]
+                self.e_t = np.random.choice(
+                    range(day_start, day_end - 1), I
+                ).tolist()
+                # random duration in [0, max_time_window_length)
+                max_len = int(self.args.get("max_time_window_length", day_end - day_start))
+                time_duration = np.random.choice(list(range(max_len)), I).tolist()
+                self.l_t = [min(s + d, day_end) for s, d in zip(self.e_t, time_duration)]
+            else:
+                self.e_t = [0.0] * I
+                self.l_t = [0.0] * I
+        
+        # ----- Service Time -----
+        if df is not None and 'service_time' in df.columns:
+            self.service_time = df['service_time'].astype(float).to_list()
+        else:
+            self.service_time = [self.args['delta']] * I
+        
+        # ----- Travel Time Matrix -----
         self.travel_time_matrix = self.args['travel_time_factor'] * (
             self.dist_matrix / self.args['r']
         )
@@ -95,12 +126,9 @@ class DataGenerator:
         ctx.add_basemap(ax=self.ax, crs=gdf.crs, attribution="")  # basemap
         self.ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.1), ncol=2)
         plt.tight_layout()
-        plt.savefig(
-            'output/network_num_vehicle{}_num_customers{}.PNG'.format(
-            self.args['V'], self.args['I'],
-            dpi=300,
-            bbox_inches='tight',
-        ))
+        out_path = 'output/network_num_vehicle{}_num_customers{}.PNG'.format(
+            self.args['V'], self.args['I'])
+        plt.savefig(out_path, dpi=300, bbox_inches='tight')
 
     def _plot_routes(self, routes):
         """
